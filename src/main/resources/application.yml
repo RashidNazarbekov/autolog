@@ -22,3 +22,8 @@ management:
 autolog:
   # Часовой пояс для «сегодня», дат в боте и отчётах
   zone: Asia/Bishkek
+  telegram:
+    # Пустой токен — бот не запускается, остальное приложение работает
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    # Имя бота без @ — для ссылок-приглашений t.me/<имя>?start=join_КОД
+    bot-username: ${TELEGRAM_BOT_USERNAME:}

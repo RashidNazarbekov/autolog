@@ -17,10 +17,22 @@ Java 21 · Spring Boot 3 · Maven · PostgreSQL 16 + Flyway · Telegram Bot API 
 ```bash
 cp .env.example .env          # заполнить секреты
 docker compose up -d db       # PostgreSQL на localhost:5432
+set -a; . ./.env; set +a      # переменные из .env в окружение
 mvn spring-boot:run           # приложение на http://localhost:8080
 ```
 
 Проверка: `curl localhost:8080/actuator/health` → `{"status":"UP"}`.
+
+### Telegram-бот
+
+1. В Telegram откройте @BotFather → `/newbot`, задайте имя и username бота.
+2. Впишите в `.env` токен (`TELEGRAM_BOT_TOKEN`) и username без @ (`TELEGRAM_BOT_USERNAME`).
+3. Запустите приложение, как выше. В логе появится строка «Telegram-бот подключён».
+4. Напишите боту `/start`: создайте дом, добавьте машины, пригласите водителей кнопкой «Пригласить» — бот даст ссылку и код.
+
+Бот работает через long polling: домен и HTTPS не нужны, но отвечает он, пока приложение запущено. Запускайте один экземпляр с токеном — два одновременно Telegram не допускает.
+
+Команды: `/menu`, `/cars`, `/invite`, `/cancel`, `/help`.
 
 Тесты (поднимают PostgreSQL в Docker сами):
 
