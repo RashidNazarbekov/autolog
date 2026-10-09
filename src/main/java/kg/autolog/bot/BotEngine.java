@@ -42,6 +42,7 @@ public class BotEngine {
     private final ChargeFlow chargeFlow;
     private final PriceFlow priceFlow;
     private final ExpenseFlow expenseFlow;
+    private final ReportFlow reportFlow;
 
     public List<Reply> handle(Incoming in) {
         var driver = drivers.register(in.userId(), in.firstName(), in.lastName(), in.username());
@@ -72,6 +73,10 @@ public class BotEngine {
             case "prices" -> List.of(priceFlow.screen(driver));
             case "expense" -> expenseFlow.start(driver);
             case "expenses" -> List.of(expenseFlow.recent(driver));
+            case "report" -> {
+                households.requireMembership(driver);
+                yield List.of(reportFlow.choosePeriod());
+            }
             case "cancel" -> cancel(driver);
             case "help" -> List.of(help());
             default -> List.of(Reply.of("Не знаю такую команду. Список — /help"), screens.menu(driver));
@@ -110,6 +115,7 @@ public class BotEngine {
                 /prices — цены на электричество
                 /expense — записать расход: мойка, ТО, шины, страховка, штраф…
                 /expenses — последние расходы
+                /report — отчёты: машины, водители, дизель против электро, журнал
                 /cancel — отменить текущий ввод
                 /help — эта справка
 
@@ -130,6 +136,9 @@ public class BotEngine {
         if (data.startsWith(Buttons.ROAD_CHARGE)) return chargeFlow.roadPressed(driver, parseId(data, Buttons.ROAD_CHARGE));
         if (data.startsWith(Buttons.CHARGE_LOCATION)) return chargeFlow.location(driver, data.substring(Buttons.CHARGE_LOCATION.length()));
         if (data.startsWith(Buttons.PRICE)) return priceFlow.edit(driver, data.substring(Buttons.PRICE.length()));
+        if (data.equals(Buttons.REPORT_CUSTOM)) return reportFlow.customPressed(driver);
+        if (data.startsWith(Buttons.REPORT)) return reportFlow.reportPressed(driver, data.substring(Buttons.REPORT.length()));
+        if (data.startsWith(Buttons.JOURNAL)) return reportFlow.journalPressed(driver, data.substring(Buttons.JOURNAL.length()));
         if (data.startsWith(Buttons.EXPENSE_CAR)) return expenseFlow.carChosen(driver, parseId(data, Buttons.EXPENSE_CAR));
         if (data.startsWith(Buttons.EXPENSE_CATEGORY)) return expenseFlow.categoryChosen(driver, parseId(data, Buttons.EXPENSE_CATEGORY));
         if (data.startsWith(Buttons.EXPENSE_SPREAD)) return expenseFlow.spreadChosen(driver, data.substring(Buttons.EXPENSE_SPREAD.length()));
@@ -165,6 +174,10 @@ public class BotEngine {
             case Buttons.FUEL_BY_TOTAL -> refuelFlow.byTotal(driver);
             case Buttons.CHARGE_SAME_ODOMETER -> chargeFlow.sameOdometer(driver);
             case Buttons.EXPENSE -> expenseFlow.start(driver);
+            case Buttons.REPORTS -> {
+                households.requireMembership(driver);
+                yield List.of(reportFlow.choosePeriod());
+            }
             case Buttons.EXPENSES -> List.of(expenseFlow.recent(driver));
             case Buttons.EXPENSE_NEW_CATEGORY -> expenseFlow.newCategory(driver);
             case Buttons.PRICES -> {
@@ -218,6 +231,7 @@ public class BotEngine {
             case EXPENSE_SPREAD -> expenseFlow.spread(driver, session, text);
             case EXPENSE_NOTE -> expenseFlow.note(driver, session, text);
             case CATEGORY_NAME -> expenseFlow.categoryName(driver, session, text);
+            case REPORT_PERIOD -> reportFlow.customText(driver, text);
         };
     }
 

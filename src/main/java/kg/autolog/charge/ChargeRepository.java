@@ -1,5 +1,6 @@
 package kg.autolog.charge;
 
+import java.time.Instant;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -19,4 +20,8 @@ public interface ChargeRepository extends JpaRepository<Charge, Long> {
     @Query("select coalesce(sum(c.endSocPct - c.startSocPct), 0) from Charge c "
             + "where c.tripId = :tripId and c.status = kg.autolog.charge.ChargeStatus.FINISHED")
     long socGainDuringTrip(@Param("tripId") long tripId);
+
+    List<Charge> findByCarIdInAndStatusAndFinishedAtBetween(List<Long> carIds, ChargeStatus status, Instant from, Instant to);
+
+    List<Charge> findByTripIdInAndStatus(List<Long> tripIds, ChargeStatus status);
 }

@@ -72,6 +72,15 @@ final class Buttons {
     /** Последние расходы */
     static final String EXPENSES = "exps";
 
+    /** Выбор периода отчёта */
+    static final String REPORTS = "reports";
+    /** rep:{week|month|last|year|d:yyyyMMdd-yyyyMMdd} — отчёт за период */
+    static final String REPORT = "rep:";
+    /** jrn:{тот же период} — журнал событий */
+    static final String JOURNAL = "jrn:";
+    /** Ввести свой период текстом */
+    static final String REPORT_CUSTOM = "rep:custom";
+
     static List<List<Reply.Button>> cancel() {
         return List.of(List.of(button("Отмена", CANCEL)));
     }

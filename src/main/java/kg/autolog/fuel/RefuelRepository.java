@@ -1,5 +1,6 @@
 package kg.autolog.fuel;
 
+import java.time.Instant;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -12,4 +13,6 @@ public interface RefuelRepository extends JpaRepository<Refuel, Long> {
     List<Refuel> findByCarIdOrderByOdometerKmDescRefueledAtDesc(long carId, Limit limit);
 
     Optional<Refuel> findFirstByCarIdOrderByRefueledAtDesc(long carId);
+
+    List<Refuel> findByCarIdInAndRefueledAtBetween(List<Long> carIds, Instant from, Instant to);
 }
