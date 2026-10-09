@@ -38,6 +38,7 @@ public class BotEngine {
     private final BotSessionStore sessions;
     private final BotScreens screens;
     private final TripFlow tripFlow;
+    private final RefuelFlow refuelFlow;
 
     public List<Reply> handle(Incoming in) {
         var driver = drivers.register(in.userId(), in.firstName(), in.lastName(), in.username());
@@ -92,6 +93,7 @@ public class BotEngine {
                 Перед поездкой: /menu → «▶ Поехать на …» → пробег.
                 Вернулись: /menu → «🏁 Закончить поездку» → пробег.
                 Для электро бот спросит ещё заряд батареи в %, для дизеля — запас хода (можно пропустить).
+                Заправились: «⛽ Заправка» → пробег → литры и цена (или сумма) — можно и посреди поездки.
 
                 <b>Команды</b>
                 /menu — машины и действия
@@ -111,6 +113,7 @@ public class BotEngine {
         if (data.startsWith(Buttons.TRIP_START)) return tripFlow.startPressed(driver, parseId(data, Buttons.TRIP_START));
         if (data.startsWith(Buttons.TRIP_FINISH)) return tripFlow.finishPressed(driver, parseId(data, Buttons.TRIP_FINISH));
         if (data.startsWith(Buttons.GAP)) return tripFlow.gapAnswer(driver, data.substring(Buttons.GAP.length()));
+        if (data.startsWith(Buttons.FUEL_CAR)) return refuelFlow.pressed(driver, parseId(data, Buttons.FUEL_CAR));
         return switch (data) {
             case Buttons.MENU -> {
                 sessions.clear(id);
@@ -137,6 +140,9 @@ public class BotEngine {
             }
             case Buttons.TRIP_SAME_ODOMETER -> tripFlow.sameOdometer(driver);
             case Buttons.GAPS -> tripFlow.gaps(driver);
+            case Buttons.FUEL_SAME_ODOMETER -> refuelFlow.sameOdometer(driver);
+            case Buttons.FUEL_LAST_PRICE -> refuelFlow.lastPrice(driver);
+            case Buttons.FUEL_BY_TOTAL -> refuelFlow.byTotal(driver);
             case Buttons.SKIP -> skip(driver);
             case Buttons.CARS -> List.of(screens.carList(driver));
             case Buttons.MEMBERS -> List.of(screens.memberList(driver));
@@ -164,6 +170,10 @@ public class BotEngine {
             case TRIP_END_ODOMETER -> tripFlow.endOdometer(driver, session, Format.integer(text));
             case TRIP_END_SOC -> tripFlow.endSoc(driver, session, text);
             case TRIP_END_RANGE -> tripFlow.endRange(driver, session, text);
+            case REFUEL_ODOMETER -> refuelFlow.odometer(driver, session, Format.integer(text));
+            case REFUEL_LITERS -> refuelFlow.liters(driver, session, text);
+            case REFUEL_PRICE -> refuelFlow.price(driver, session, text);
+            case REFUEL_TOTAL -> refuelFlow.total(driver, session, text);
         };
     }
 

@@ -64,12 +64,15 @@ class BotScreens {
         }
         for (var c : list) {
             sb.append(carLine(c, names)).append('\n');
+            var row = new ArrayList<Reply.Button>();
             if (c.getState() == CarState.FREE) {
-                rows.add(List.of(button("▶ Поехать на «" + c.getName() + "»", Buttons.TRIP_START + c.getId())));
+                row.add(button("▶ Поехать на «" + c.getName() + "»", Buttons.TRIP_START + c.getId()));
             } else if (c.getState() == CarState.ON_TRIP && driver.getId().equals(c.getCurrentDriverId())) {
                 trips.openTripOf(c.getId()).ifPresent(t ->
-                        rows.add(List.of(button("🏁 Закончить поездку на «" + c.getName() + "»", Buttons.TRIP_FINISH + t.getId()))));
+                        row.add(button("🏁 Закончить поездку на «" + c.getName() + "»", Buttons.TRIP_FINISH + t.getId())));
             }
+            if (RefuelFlow.canRefuel(c, driver)) row.add(button("⛽ Заправка", Buttons.FUEL_CAR + c.getId()));
+            if (!row.isEmpty()) rows.add(row);
         }
         var gaps = trips.openGaps(driver);
         if (!gaps.isEmpty()) {
