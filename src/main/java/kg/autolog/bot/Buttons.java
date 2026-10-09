@@ -32,6 +32,15 @@ final class Buttons {
     /** gap:{gapId}:{driverId}; driverId = 0 — «не знаю» */
     static final String GAP = "gap:";
 
+    /** fuel:car:{carId} — начать запись заправки */
+    static final String FUEL_CAR = "fuel:car:";
+    /** Пробег не изменился с прошлой отметки */
+    static final String FUEL_SAME_ODOMETER = "fuel:same";
+    /** Цена за литр как в прошлый раз */
+    static final String FUEL_LAST_PRICE = "fuel:lastprice";
+    /** Ввести сумму вместо литров или цены */
+    static final String FUEL_BY_TOTAL = "fuel:sum";
+
     static List<List<Reply.Button>> cancel() {
         return List.of(List.of(button("Отмена", CANCEL)));
     }

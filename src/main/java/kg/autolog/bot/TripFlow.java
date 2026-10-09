@@ -95,9 +95,11 @@ class TripFlow {
         if (trip.getStartRangeKm() != null) sb.append(", запас хода ").append(Format.km(trip.getStartRangeKm())).append(" км");
         sb.append("\n\nКогда вернётесь — нажмите «Закончить».");
         var replies = new ArrayList<Reply>();
-        replies.add(Reply.of(sb.toString(), List.of(
-                List.of(button("🏁 Закончить поездку", Buttons.TRIP_FINISH + trip.getId())),
-                List.of(button("Меню", Buttons.MENU)))));
+        var rows = new ArrayList<List<Reply.Button>>();
+        rows.add(List.of(button("🏁 Закончить поездку", Buttons.TRIP_FINISH + trip.getId())));
+        if (!car.isElectric()) rows.add(List.of(button("⛽ Заправка в пути", Buttons.FUEL_CAR + car.getId())));
+        rows.add(List.of(button("Меню", Buttons.MENU)));
+        replies.add(Reply.of(sb.toString(), rows));
         if (result.gap() != null) replies.add(screens.gapQuestion(driver, result.gap()));
         return replies;
     }
@@ -165,8 +167,10 @@ class TripFlow {
             if (per100 != null) sb.append(" — ").append(Format.number(per100)).append(" кВт·ч на 100 км");
         }
         if (r.estimatedLiters() != null) {
-            sb.append("\n≈ ").append(Format.number(r.estimatedLiters())).append(" л по заводскому расходу ")
-                    .append(Format.number(r.car().getRatedConsumption())).append(" л/100 км");
+            sb.append("\n≈ ").append(Format.number(r.estimatedLiters())).append(" л");
+            if (r.estimatedCost() != null) sb.append(" ≈ <b>").append(Format.number(r.estimatedCost())).append(" сом</b>");
+            sb.append(r.fromRefuels() ? " по вашему среднему расходу " : " по заводскому расходу ")
+                    .append(Format.number(r.litersPer100Km())).append(" л/100 км");
         }
         return List.of(Reply.of(sb.toString()), screens.menu(driver));
     }

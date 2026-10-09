@@ -7,6 +7,7 @@ import kg.autolog.car.CarState;
 import kg.autolog.common.AutologException;
 import kg.autolog.driver.Driver;
 import kg.autolog.driver.DriverRepository;
+import kg.autolog.fuel.FuelEconomy;
 import kg.autolog.household.HouseholdMemberRepository;
 import kg.autolog.household.HouseholdService;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,7 @@ public class TripService {
     private final HouseholdService households;
     private final HouseholdMemberRepository members;
     private final DriverRepository drivers;
+    private final FuelEconomy fuel;
     private final Clock clock;
 
     /** @param gap неучтённый пробег перед этой поездкой, если одометр ушёл вперёд */
@@ -45,11 +47,15 @@ public class TripService {
     }
 
     /**
-     * @param energyKwh      для электро: сколько кВт·ч ушло по падению заряда
-     * @param estimatedLiters для дизеля: оценка по заводскому расходу, если он указан
+     * @param energyKwh       для электро: сколько кВт·ч ушло по падению заряда
+     * @param estimatedLiters для дизеля: км × средний расход (по заправкам, иначе заводской)
+     * @param estimatedCost   для дизеля: литры × средняя цена по заправкам; {@code null}, если заправок не было
+     * @param litersPer100Km  расход, по которому считали литры
+     * @param fromRefuels     расход посчитан по заправкам ({@code false} — заводской)
      */
     public record FinishResult(Trip trip, Car car, int distanceKm, Duration duration,
-                               BigDecimal energyKwh, BigDecimal estimatedLiters) {
+                               BigDecimal energyKwh, BigDecimal estimatedLiters, BigDecimal estimatedCost,
+                               BigDecimal litersPer100Km, boolean fromRefuels) {
 
         /** кВт·ч на 100 км для электро, если есть пробег. */
         public BigDecimal consumptionPer100() {
@@ -151,16 +157,19 @@ public class TripService {
         flush(car);
 
         int km = trip.distanceKm();
-        BigDecimal energy = null;
-        BigDecimal liters = null;
-        if (car.isElectric() && trip.getStartSocPct() != null && socPct != null) {
-            energy = car.getBatteryKwh().multiply(BigDecimal.valueOf(trip.getStartSocPct() - socPct))
-                    .divide(BigDecimal.valueOf(100), 1, RoundingMode.HALF_UP);
-        } else if (!car.isElectric() && car.getRatedConsumption() != null) {
-            liters = car.getRatedConsumption().multiply(BigDecimal.valueOf(km))
-                    .divide(BigDecimal.valueOf(100), 1, RoundingMode.HALF_UP);
+        if (car.isElectric()) {
+            BigDecimal energy = null;
+            if (trip.getStartSocPct() != null && socPct != null) {
+                energy = car.getBatteryKwh().multiply(BigDecimal.valueOf(trip.getStartSocPct() - socPct))
+                        .divide(BigDecimal.valueOf(100), 1, RoundingMode.HALF_UP);
+            }
+            return new FinishResult(trip, car, km, trip.duration(), energy, null, null, null, false);
         }
-        return new FinishResult(trip, car, km, trip.duration(), energy, liters);
+        var f = fuel.tripFuel(car, km).orElse(null);
+        return f == null
+                ? new FinishResult(trip, car, km, trip.duration(), null, null, null, null, false)
+                : new FinishResult(trip, car, km, trip.duration(), null, f.liters(), f.cost(),
+                        f.basis().litersPer100Km(), f.basis().fromRefuels());
     }
 
     /** Неучтённые км, по которым ещё не выяснили, кто ездил. */
