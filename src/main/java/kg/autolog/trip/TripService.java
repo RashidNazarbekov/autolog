@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -84,6 +85,26 @@ public class TripService {
         var trip = trips.findById(tripId).filter(Trip::isOpen)
                 .orElseThrow(() -> new AutologException.NotFound("Эта поездка уже закончена"));
         cars.require(driver, trip.getCarId());
+        return trip;
+    }
+
+    /**
+     * Забирает поездки, о которых пора напомнить: открыты дольше {@code openFor}
+     * и без напоминания последние {@code repeatEvery}. Сразу отмечает их напомненными,
+     * чтобы следующая проверка не прислала то же самое.
+     */
+    @Transactional
+    public List<Trip> takeDueReminders(Instant now, Duration openFor, Duration repeatEvery) {
+        var due = trips.findDueForReminder(now.minus(openFor), now.minus(repeatEvery));
+        due.forEach(t -> t.setRemindedAt(now));
+        return due;
+    }
+
+    /** «Ещё еду»: следующее напоминание — через обычный интервал. */
+    @Transactional
+    public Trip snooze(Driver driver, long tripId) {
+        var trip = requireOpenTrip(driver, tripId);
+        trip.setRemindedAt(clock.instant());
         return trip;
     }
 

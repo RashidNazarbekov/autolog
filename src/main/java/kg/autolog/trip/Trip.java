@@ -62,6 +62,10 @@ public class Trip {
     @Column(name = "end_range_km")
     private Integer endRangeKm;
 
+    /** Последнее напоминание о незакрытой поездке или ответ «ещё еду». */
+    @Column(name = "reminded_at")
+    private Instant remindedAt;
+
     public Trip(long carId, long driverId, Instant startedAt, int startOdometerKm, Integer startSocPct, Integer startRangeKm) {
         this.carId = carId;
         this.driverId = driverId;

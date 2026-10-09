@@ -27,3 +27,11 @@ autolog:
     bot-token: ${TELEGRAM_BOT_TOKEN:}
     # Имя бота без @ — для ссылок-приглашений t.me/<имя>?start=join_КОД
     bot-username: ${TELEGRAM_BOT_USERNAME:}
+  reminders:
+    # Напомнить водителю, если поездка открыта дольше…
+    open-trip-after: 6h
+    # …и повторять, пока не закроет
+    repeat-every: 12h
+    # Тихие часы: с 22 до 8 не пишем, напомним утром
+    quiet-from: 22
+    quiet-to: 8
