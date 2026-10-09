@@ -25,7 +25,13 @@ jobs:
 
       # Тесты используют Testcontainers: Docker на ubuntu-latest уже есть
       - name: Build and test
-        run: mvn -B verify
+        run: |
+          set -o pipefail
+          mvn -B verify 2>&1 | tee build.log || {
+            # Ошибки компиляции и упавшие тесты — в аннотации, чтобы видеть их без скачивания логов
+            grep -E "^\[ERROR\] .+" build.log | head -40 | sed 's/^/::error::/'
+            exit 1
+          }
 
       - name: Test report
         if: failure()
