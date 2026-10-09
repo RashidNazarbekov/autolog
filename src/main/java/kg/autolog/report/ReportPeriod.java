@@ -7,7 +7,6 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -56,7 +55,7 @@ public record ReportPeriod(LocalDate from, LocalDate to, String title) {
             var from = date(m.group(1), m.group(2), m.group(3), today);
             var to = date(m.group(4), m.group(5), m.group(6), today);
             return new ReportPeriod(from, to, SHORT.format(from) + "–" + SHORT.format(to));
-        } catch (DateTimeParseException | java.time.DateTimeException e) {
+        } catch (java.time.DateTimeException e) {
             throw new AutologException.Invalid("Такой даты нет — проверьте день и месяц");
         }
     }
