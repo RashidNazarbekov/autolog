@@ -57,6 +57,21 @@ final class Buttons {
     /** set:{PriceSetting} — изменить цену */
     static final String PRICE = "set:";
 
+    /** Начать запись прочего расхода */
+    static final String EXPENSE = "exp";
+    /** exp:car:{carId} */
+    static final String EXPENSE_CAR = "exp:car:";
+    /** exp:cat:{categoryId} */
+    static final String EXPENSE_CATEGORY = "exp:cat:";
+    /** exp:spread:{months} */
+    static final String EXPENSE_SPREAD = "exp:spread:";
+    /** exp:who:{driverId}; 0 — «не знаю» */
+    static final String EXPENSE_OFFENDER = "exp:who:";
+    /** Добавить свою категорию (владелец) */
+    static final String EXPENSE_NEW_CATEGORY = "exp:newcat";
+    /** Последние расходы */
+    static final String EXPENSES = "exps";
+
     static List<List<Reply.Button>> cancel() {
         return List.of(List.of(button("Отмена", CANCEL)));
     }

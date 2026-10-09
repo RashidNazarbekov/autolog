@@ -5,6 +5,7 @@ import kg.autolog.common.AutologProperties;
 import kg.autolog.driver.Driver;
 import kg.autolog.driver.DriverRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +28,12 @@ public class HouseholdService {
     private final DriverRepository drivers;
     private final AutologProperties props;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
     private final SecureRandom random = new SecureRandom();
+
+    /** Дом создан — другие части системы готовят для него своё (например, категории расходов). */
+    public record HouseholdCreated(long householdId) {
+    }
 
     /** Участник дома вместе с данными водителя — для списков. */
     public record MemberView(long driverId, String name, String username, MemberRole role, Instant joinedAt) {
@@ -41,6 +47,7 @@ public class HouseholdService {
         }
         var household = households.save(new Household(cleanName(name), clock.instant()));
         members.save(new HouseholdMember(household.getId(), owner.getId(), MemberRole.OWNER, clock.instant()));
+        events.publishEvent(new HouseholdCreated(household.getId()));
         return household;
     }
 

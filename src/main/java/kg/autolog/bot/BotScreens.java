@@ -90,6 +90,7 @@ class BotScreens {
             sb.append("\n⚠️ Неучтённый пробег: ").append(Format.km(km)).append(" км — кто ездил?");
             rows.add(List.of(button("⚠️ Разобрать неучтённые км", Buttons.GAPS)));
         }
+        if (!list.isEmpty()) rows.add(List.of(button("💳 Расход", Buttons.EXPENSE), button("📋 Расходы", Buttons.EXPENSES)));
         rows.add(List.of(button("🚗 Машины", Buttons.CARS), button("👥 Водители", Buttons.MEMBERS)));
         if (member.isOwner()) {
             rows.add(List.of(button("➕ Машина", Buttons.ADD_CAR), button("🔗 Пригласить", Buttons.INVITE)));
