@@ -25,6 +25,8 @@ final class Buttons {
     static final String TRIP_START = "trip:start:";
     /** trip:finish:{tripId} */
     static final String TRIP_FINISH = "trip:finish:";
+    /** trip:snooze:{tripId} — «ещё еду» в ответ на напоминание */
+    static final String TRIP_SNOOZE = "trip:snooze:";
     /** Пробег не изменился с прошлой отметки */
     static final String TRIP_SAME_ODOMETER = "trip:same";
     /** Разобрать неучтённый пробег */

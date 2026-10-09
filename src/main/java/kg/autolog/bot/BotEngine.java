@@ -43,6 +43,7 @@ public class BotEngine {
     private final PriceFlow priceFlow;
     private final ExpenseFlow expenseFlow;
     private final ReportFlow reportFlow;
+    private final TripReminders tripReminders;
 
     public List<Reply> handle(Incoming in) {
         var driver = drivers.register(in.userId(), in.firstName(), in.lastName(), in.username());
@@ -129,6 +130,7 @@ public class BotEngine {
         if (data.startsWith(Buttons.CAR_TYPE)) return carTypeChosen(driver, data.substring(Buttons.CAR_TYPE.length()));
         if (data.startsWith(Buttons.TRIP_START)) return tripFlow.startPressed(driver, parseId(data, Buttons.TRIP_START));
         if (data.startsWith(Buttons.TRIP_FINISH)) return tripFlow.finishPressed(driver, parseId(data, Buttons.TRIP_FINISH));
+        if (data.startsWith(Buttons.TRIP_SNOOZE)) return tripReminders.snoozePressed(driver, parseId(data, Buttons.TRIP_SNOOZE));
         if (data.startsWith(Buttons.GAP)) return tripFlow.gapAnswer(driver, data.substring(Buttons.GAP.length()));
         if (data.startsWith(Buttons.FUEL_CAR)) return refuelFlow.pressed(driver, parseId(data, Buttons.FUEL_CAR));
         if (data.startsWith(Buttons.CHARGE_CAR)) return chargeFlow.pressed(driver, parseId(data, Buttons.CHARGE_CAR));

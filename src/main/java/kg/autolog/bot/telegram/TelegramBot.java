@@ -95,6 +95,11 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         send(chatId, replies);
     }
 
+    /** Сообщение по инициативе бота (напоминание). В личном чате chat id совпадает с id пользователя. */
+    public void push(long telegramId, Reply reply) {
+        send(telegramId, List.of(reply));
+    }
+
     private void send(long chatId, List<Reply> replies) {
         for (var reply : replies) {
             var message = SendMessage.builder()
