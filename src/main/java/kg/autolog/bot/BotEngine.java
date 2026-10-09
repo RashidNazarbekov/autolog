@@ -1,20 +1,16 @@
 package kg.autolog.bot;
 
-import kg.autolog.car.Car;
 import kg.autolog.car.CarDraft;
 import kg.autolog.car.CarService;
 import kg.autolog.car.FuelType;
 import kg.autolog.common.AutologException;
-import kg.autolog.common.AutologProperties;
 import kg.autolog.driver.Driver;
 import kg.autolog.driver.DriverService;
 import kg.autolog.household.HouseholdService;
-import kg.autolog.household.MemberRole;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +21,7 @@ import static kg.autolog.bot.Reply.button;
 /**
  * Ядро бота: превращает сообщение или нажатие кнопки в ответы.
  * Не знает про библиотеку Telegram, поэтому все сценарии проверяются тестами.
+ * Экраны — в {@link BotScreens}, сценарий поездки — в {@link TripFlow}.
  *
  * <p>Метод {@link #handle} сам не транзакционный: каждое обращение к сервисам — своя транзакция,
  * поэтому ошибка ввода не откатывает уже сохранённое и не ломает следующий шаг.
@@ -33,25 +30,14 @@ import static kg.autolog.bot.Reply.button;
 @RequiredArgsConstructor
 public class BotEngine {
 
-    // Данные кнопок
-    static final String MENU = "menu";
-    static final String CREATE_HOME = "home:create";
-    static final String JOIN_HOME = "home:join";
-    static final String CARS = "cars";
-    static final String MEMBERS = "members";
-    static final String INVITE = "invite";
-    static final String ADD_CAR = "car:add";
-    static final String CAR_TYPE = "car:type:";
-    static final String SKIP = "skip";
-    static final String CANCEL = "cancel";
-
     static final String JOIN_PREFIX = "join_";
 
     private final DriverService drivers;
     private final HouseholdService households;
     private final CarService cars;
     private final BotSessionStore sessions;
-    private final AutologProperties props;
+    private final BotScreens screens;
+    private final TripFlow tripFlow;
 
     public List<Reply> handle(Incoming in) {
         var driver = drivers.register(in.userId(), in.firstName(), in.lastName(), in.username());
@@ -61,7 +47,7 @@ public class BotEngine {
             if (text.startsWith("/")) return onCommand(driver, text);
             return onText(driver, text);
         } catch (AutologException e) {
-            return List.of(Reply.of("⚠️ " + esc(e.getMessage())));
+            return List.of(Reply.of("⚠️ " + esc(e.getMessage()), Buttons.menu()));
         }
     }
 
@@ -75,13 +61,13 @@ public class BotEngine {
             case "start" -> start(driver, arg);
             case "menu", "home" -> {
                 sessions.clear(driver.getTelegramId());
-                yield List.of(menu(driver));
+                yield List.of(screens.menu(driver));
             }
-            case "cars" -> List.of(carList(driver));
-            case "invite" -> List.of(invite(driver));
+            case "cars" -> List.of(screens.carList(driver));
+            case "invite" -> List.of(screens.invite(driver));
             case "cancel" -> cancel(driver);
             case "help" -> List.of(help());
-            default -> List.of(Reply.of("Не знаю такую команду. Список — /help"), menu(driver));
+            default -> List.of(Reply.of("Не знаю такую команду. Список — /help"), screens.menu(driver));
         };
     }
 
@@ -90,29 +76,25 @@ public class BotEngine {
         if (arg.startsWith(JOIN_PREFIX)) {
             return join(driver, arg.substring(JOIN_PREFIX.length()));
         }
-        if (households.membershipOf(driver).isPresent()) {
-            return List.of(menu(driver));
-        }
-        return List.of(Reply.of(
-                "Привет, " + esc(driver.getName()) + "! 👋\n\n"
-                        + "Я веду журнал машин вашей семьи: кто на какой машине ездил, "
-                        + "сколько ушло топлива или заряда и во что обходится километр.\n\n"
-                        + "Для начала создайте дом и добавьте машины — или вступите в дом по коду от владельца.",
-                List.of(List.of(button("🏠 Создать дом", CREATE_HOME)),
-                        List.of(button("🔑 У меня есть код", JOIN_HOME)))));
+        return List.of(screens.menu(driver));
     }
 
     private List<Reply> cancel(Driver driver) {
         sessions.clear(driver.getTelegramId());
         return households.membershipOf(driver).isPresent()
-                ? List.of(Reply.of("Отменено."), menu(driver))
-                : start(driver, "");
+                ? List.of(Reply.of("Отменено."), screens.menu(driver))
+                : List.of(screens.welcome(driver));
     }
 
     private Reply help() {
         return Reply.of("""
+                <b>Как пользоваться</b>
+                Перед поездкой: /menu → «▶ Поехать на …» → пробег.
+                Вернулись: /menu → «🏁 Закончить поездку» → пробег.
+                Для электро бот спросит ещё заряд батареи в %, для дизеля — запас хода (можно пропустить).
+
                 <b>Команды</b>
-                /menu — главное меню: машины и действия
+                /menu — машины и действия
                 /cars — машины дома
                 /invite — пригласить водителя (для владельца)
                 /cancel — отменить текущий ввод
@@ -125,39 +107,42 @@ public class BotEngine {
 
     private List<Reply> onButton(Driver driver, String data) {
         var id = driver.getTelegramId();
-        if (data.startsWith(CAR_TYPE)) {
-            return carTypeChosen(driver, data.substring(CAR_TYPE.length()));
-        }
+        if (data.startsWith(Buttons.CAR_TYPE)) return carTypeChosen(driver, data.substring(Buttons.CAR_TYPE.length()));
+        if (data.startsWith(Buttons.TRIP_START)) return tripFlow.startPressed(driver, parseId(data, Buttons.TRIP_START));
+        if (data.startsWith(Buttons.TRIP_FINISH)) return tripFlow.finishPressed(driver, parseId(data, Buttons.TRIP_FINISH));
+        if (data.startsWith(Buttons.GAP)) return tripFlow.gapAnswer(driver, data.substring(Buttons.GAP.length()));
         return switch (data) {
-            case MENU -> {
+            case Buttons.MENU -> {
                 sessions.clear(id);
-                yield List.of(menu(driver));
+                yield List.of(screens.menu(driver));
             }
-            case CREATE_HOME -> {
+            case Buttons.CREATE_HOME -> {
                 if (households.membershipOf(driver).isPresent()) {
-                    yield List.of(Reply.of("Вы уже состоите в доме."), menu(driver));
+                    yield List.of(Reply.of("Вы уже состоите в доме."), screens.menu(driver));
                 }
                 sessions.save(id, BotState.AWAIT_HOUSEHOLD_NAME, new LinkedHashMap<>());
-                yield List.of(Reply.of("Как назовём дом? Например: <i>Дом Назарбековых</i>", cancelButton()));
+                yield List.of(Reply.of("Как назовём дом? Например: <i>Дом Назарбековых</i>", Buttons.cancel()));
             }
-            case JOIN_HOME -> {
+            case Buttons.JOIN_HOME -> {
                 sessions.save(id, BotState.AWAIT_INVITE_CODE, new LinkedHashMap<>());
-                yield List.of(Reply.of("Пришлите код приглашения от владельца дома — 8 букв и цифр.", cancelButton()));
+                yield List.of(Reply.of("Пришлите код приглашения от владельца дома — 8 букв и цифр.", Buttons.cancel()));
             }
-            case ADD_CAR -> {
+            case Buttons.ADD_CAR -> {
                 households.requireOwner(driver);
                 sessions.save(id, BotState.CAR_AWAIT_TYPE, new LinkedHashMap<>());
                 yield List.of(Reply.of("Какая машина?", List.of(
-                        List.of(button("⛽ Дизель", CAR_TYPE + FuelType.DIESEL),
-                                button("🔌 Электро", CAR_TYPE + FuelType.ELECTRIC)),
-                        List.of(button("Отмена", CANCEL)))));
+                        List.of(button("⛽ Дизель", Buttons.CAR_TYPE + FuelType.DIESEL),
+                                button("🔌 Электро", Buttons.CAR_TYPE + FuelType.ELECTRIC)),
+                        List.of(button("Отмена", Buttons.CANCEL)))));
             }
-            case SKIP -> skip(driver);
-            case CARS -> List.of(carList(driver));
-            case MEMBERS -> List.of(memberList(driver));
-            case INVITE -> List.of(invite(driver));
-            case CANCEL -> cancel(driver);
-            default -> List.of(Reply.of("Эта кнопка устарела."), menu(driver));
+            case Buttons.TRIP_SAME_ODOMETER -> tripFlow.sameOdometer(driver);
+            case Buttons.GAPS -> tripFlow.gaps(driver);
+            case Buttons.SKIP -> skip(driver);
+            case Buttons.CARS -> List.of(screens.carList(driver));
+            case Buttons.MEMBERS -> List.of(screens.memberList(driver));
+            case Buttons.INVITE -> List.of(screens.invite(driver));
+            case Buttons.CANCEL -> cancel(driver);
+            default -> stale(driver);
         };
     }
 
@@ -166,13 +151,19 @@ public class BotEngine {
     private List<Reply> onText(Driver driver, String text) {
         var session = sessions.get(driver.getTelegramId());
         return switch (session.state()) {
-            case NONE, CAR_AWAIT_TYPE -> List.of(Reply.of("Выберите действие кнопкой или командой — /help"), homeOrWelcome(driver));
+            case NONE, CAR_AWAIT_TYPE -> List.of(Reply.of("Выберите действие кнопкой или командой — /help"), screens.menu(driver));
             case AWAIT_HOUSEHOLD_NAME -> createHousehold(driver, text);
             case AWAIT_INVITE_CODE -> join(driver, text);
             case CAR_AWAIT_NAME -> carName(driver, session, text);
             case CAR_AWAIT_CAPACITY -> carCapacity(driver, session, text);
             case CAR_AWAIT_ODOMETER -> carOdometer(driver, session, text);
             case CAR_AWAIT_CONSUMPTION -> carConsumption(driver, session, text);
+            case TRIP_START_ODOMETER -> tripFlow.startOdometer(driver, session, Format.integer(text));
+            case TRIP_START_SOC -> tripFlow.startSoc(driver, session, text);
+            case TRIP_START_RANGE -> tripFlow.startRange(driver, session, text);
+            case TRIP_END_ODOMETER -> tripFlow.endOdometer(driver, session, Format.integer(text));
+            case TRIP_END_SOC -> tripFlow.endSoc(driver, session, text);
+            case TRIP_END_RANGE -> tripFlow.endRange(driver, session, text);
         };
     }
 
@@ -181,15 +172,26 @@ public class BotEngine {
         sessions.clear(driver.getTelegramId());
         return List.of(Reply.of(
                 "🏠 Дом «" + esc(home.getName()) + "» создан, вы — владелец.\n\nТеперь добавьте машины и пригласите остальных водителей.",
-                List.of(List.of(button("➕ Добавить машину", ADD_CAR)),
-                        List.of(button("👥 Пригласить водителя", INVITE)),
-                        List.of(button("Меню", MENU)))));
+                List.of(List.of(button("➕ Добавить машину", Buttons.ADD_CAR)),
+                        List.of(button("👥 Пригласить водителя", Buttons.INVITE)),
+                        List.of(button("Меню", Buttons.MENU)))));
     }
 
     private List<Reply> join(Driver driver, String code) {
         var home = households.join(driver, code);
         sessions.clear(driver.getTelegramId());
-        return List.of(Reply.of("✅ Вы в доме «" + esc(home.getName()) + "»."), menu(driver));
+        return List.of(Reply.of("✅ Вы в доме «" + esc(home.getName()) + "»."), screens.menu(driver));
+    }
+
+    private List<Reply> skip(Driver driver) {
+        var session = sessions.get(driver.getTelegramId());
+        if (session.state() == BotState.CAR_AWAIT_CONSUMPTION) return saveCar(driver, session.data(), null);
+        if (TripFlow.isRangeStep(session.state())) return tripFlow.skipRange(driver, session);
+        return stale(driver);
+    }
+
+    private List<Reply> stale(Driver driver) {
+        return List.of(Reply.of("Эта кнопка устарела."), screens.menu(driver));
     }
 
     // ---------- Мастер добавления машины ----------
@@ -200,13 +202,13 @@ public class BotEngine {
         try {
             fuel = FuelType.valueOf(type);
         } catch (IllegalArgumentException e) {
-            return List.of(Reply.of("Эта кнопка устарела."), menu(driver));
+            return stale(driver);
         }
         var data = new LinkedHashMap<String, String>();
         data.put("type", fuel.name());
         sessions.save(driver.getTelegramId(), BotState.CAR_AWAIT_NAME, data);
         return List.of(Reply.of("Как называете машину дома? Например: <i>"
-                + (fuel == FuelType.DIESEL ? "Прадо" : "Эмка") + "</i>", cancelButton()));
+                + (fuel == FuelType.DIESEL ? "Прадо" : "Эмка") + "</i>", Buttons.cancel()));
     }
 
     private List<Reply> carName(Driver driver, BotSessionStore.Session session, String text) {
@@ -221,7 +223,7 @@ public class BotEngine {
         sessions.save(driver.getTelegramId(), BotState.CAR_AWAIT_CAPACITY, data);
         return List.of(Reply.of(isElectric(data)
                 ? "Ёмкость батареи, кВт·ч? Например: <i>40,3</i>"
-                : "Объём бака, л? Например: <i>87</i>", cancelButton()));
+                : "Объём бака, л? Например: <i>87</i>", Buttons.cancel()));
     }
 
     private List<Reply> carCapacity(Driver driver, BotSessionStore.Session session, String text) {
@@ -235,7 +237,7 @@ public class BotEngine {
         var data = new LinkedHashMap<>(session.data());
         data.put("capacity", value.toPlainString());
         sessions.save(driver.getTelegramId(), BotState.CAR_AWAIT_ODOMETER, data);
-        return List.of(Reply.of("Текущий пробег по одометру, км? Например: <i>150 000</i>", cancelButton()));
+        return List.of(Reply.of("Текущий пробег по одометру, км? Например: <i>150 000</i>", Buttons.cancel()));
     }
 
     private List<Reply> carOdometer(Driver driver, BotSessionStore.Session session, String text) {
@@ -249,7 +251,7 @@ public class BotEngine {
         return List.of(Reply.of(isElectric(data)
                         ? "Заводской расход, кВт·ч на 100 км? Например: <i>13</i>\nНе знаете — нажмите «Пропустить», посчитаю по вашим поездкам."
                         : "Заводской расход, л на 100 км? Например: <i>9,5</i>\nНе знаете — нажмите «Пропустить», посчитаю по вашим заправкам.",
-                List.of(List.of(button("Пропустить", SKIP)), List.of(button("Отмена", CANCEL)))));
+                Buttons.skipOrCancel()));
     }
 
     private List<Reply> carConsumption(Driver driver, BotSessionStore.Session session, String text) {
@@ -258,14 +260,6 @@ public class BotEngine {
             return retry("Нужно число от 1 до 60, например <i>9,5</i> — или нажмите «Пропустить»");
         }
         return saveCar(driver, session.data(), value);
-    }
-
-    private List<Reply> skip(Driver driver) {
-        var session = sessions.get(driver.getTelegramId());
-        if (session.state() != BotState.CAR_AWAIT_CONSUMPTION) {
-            return List.of(Reply.of("Эта кнопка устарела."), menu(driver));
-        }
-        return saveCar(driver, session.data(), null);
     }
 
     private List<Reply> saveCar(Driver driver, Map<String, String> data, BigDecimal consumption) {
@@ -281,107 +275,27 @@ public class BotEngine {
                 Integer.valueOf(data.get("odometer")));
         sessions.clear(driver.getTelegramId());
         var car = cars.add(driver, draft);
-        return List.of(Reply.of("✅ Добавлена: " + carLine(car),
-                List.of(List.of(button("➕ Ещё машина", ADD_CAR)),
-                        List.of(button("👥 Пригласить водителя", INVITE)),
-                        List.of(button("Меню", MENU)))));
-    }
-
-    // ---------- Экраны ----------
-
-    /** Главное меню для участника дома, приветствие — для остальных. */
-    private Reply homeOrWelcome(Driver driver) {
-        return households.membershipOf(driver).isPresent() ? menu(driver) : start(driver, "").get(0);
-    }
-
-    Reply menu(Driver driver) {
-        var member = households.membershipOf(driver).orElse(null);
-        if (member == null) return start(driver, "").get(0);
-        var home = households.requireHousehold(driver);
-        var list = cars.list(driver);
-        var sb = new StringBuilder("🏠 <b>").append(esc(home.getName())).append("</b>\n\n");
-        if (list.isEmpty()) {
-            sb.append(member.isOwner() ? "Машин пока нет — добавьте первую." : "Машин пока нет — их добавит владелец дома.");
-        } else {
-            list.forEach(c -> sb.append(carLine(c)).append('\n'));
-        }
-        var rows = new ArrayList<List<Reply.Button>>();
-        rows.add(List.of(button("🚗 Машины", CARS), button("👥 Водители", MEMBERS)));
-        if (member.isOwner()) {
-            rows.add(List.of(button("➕ Машина", ADD_CAR), button("🔗 Пригласить", INVITE)));
-        }
-        return Reply.of(sb.toString().trim(), rows);
-    }
-
-    private Reply carList(Driver driver) {
-        var list = cars.list(driver);
-        if (list.isEmpty()) return Reply.of("Машин пока нет.", menuButton());
-        var sb = new StringBuilder("<b>Машины</b>\n\n");
-        for (var c : list) {
-            sb.append(carLine(c)).append('\n');
-            sb.append(c.isElectric()
-                    ? "   батарея " + Format.number(c.getBatteryKwh()) + " кВт·ч"
-                    : "   бак " + Format.number(c.getTankLiters()) + " л");
-            if (c.getRatedConsumption() != null) {
-                sb.append(" · расход ").append(Format.number(c.getRatedConsumption()))
-                        .append(c.isElectric() ? " кВт·ч/100 км" : " л/100 км");
-            }
-            sb.append("\n\n");
-        }
-        return Reply.of(sb.toString().trim(), menuButton());
-    }
-
-    private Reply memberList(Driver driver) {
-        var sb = new StringBuilder("<b>Водители</b>\n\n");
-        for (var m : households.members(driver)) {
-            sb.append(m.role() == MemberRole.OWNER ? "👑 " : "• ").append(esc(m.name()));
-            if (m.username() != null) sb.append(" (@").append(esc(m.username())).append(')');
-            if (m.role() == MemberRole.OWNER) sb.append(" — владелец");
-            sb.append('\n');
-        }
-        return Reply.of(sb.toString().trim(), menuButton());
-    }
-
-    private Reply invite(Driver driver) {
-        var code = households.createInvite(driver);
-        var username = props.telegram().botUsername();
-        var sb = new StringBuilder("🔗 <b>Приглашение в дом</b>\n\n");
-        if (username != null && !username.isBlank()) {
-            sb.append("Перешлите эту ссылку водителю — по ней он сразу попадёт в дом:\n")
-                    .append("https://t.me/").append(esc(username)).append("?start=").append(JOIN_PREFIX).append(code)
-                    .append("\n\nИли пусть нажмёт в боте «У меня есть код» и введёт: <code>").append(code).append("</code>");
-        } else {
-            sb.append("Пусть водитель откроет бота, нажмёт «У меня есть код» и введёт:\n<code>").append(code).append("</code>");
-        }
-        sb.append("\n\nКод действует ").append(props.inviteTtl().toHours()).append(" ч. Новый код отменяет прежний.");
-        return Reply.of(sb.toString(), menuButton());
-    }
-
-    static String carLine(Car c) {
-        var icon = c.isElectric() ? "🔌" : "⛽";
-        var state = switch (c.getState()) {
-            case FREE -> "свободна";
-            case ON_TRIP -> "в поездке";
-            case CHARGING -> "на зарядке";
-        };
-        return icon + " <b>" + esc(c.getName()) + "</b> — " + Format.km(c.getOdometerKm()) + " км · " + state;
+        return List.of(Reply.of("✅ Добавлена: " + screens.carLine(car),
+                List.of(List.of(button("➕ Ещё машина", Buttons.ADD_CAR)),
+                        List.of(button("👥 Пригласить водителя", Buttons.INVITE)),
+                        List.of(button("Меню", Buttons.MENU)))));
     }
 
     // ---------- Мелочи ----------
+
+    private static long parseId(String data, String prefix) {
+        try {
+            return Long.parseLong(data.substring(prefix.length()));
+        } catch (NumberFormatException e) {
+            throw new AutologException.NotFound("Эта кнопка устарела");
+        }
+    }
 
     private static boolean isElectric(Map<String, String> data) {
         return FuelType.ELECTRIC.name().equals(data.get("type"));
     }
 
     private static List<Reply> retry(String text) {
-        return List.of(Reply.of("⚠️ " + text, cancelButton()));
-    }
-
-    private static List<List<Reply.Button>> cancelButton() {
-        return List.of(List.of(button("Отмена", CANCEL)));
-    }
-
-    private static List<List<Reply.Button>> menuButton() {
-        return List.of(List.of(button("Меню", MENU)));
+        return List.of(Reply.of("⚠️ " + text, Buttons.cancel()));
     }
 }
