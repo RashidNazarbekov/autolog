@@ -3,6 +3,7 @@ package kg.autolog.bot;
 import kg.autolog.car.Car;
 import kg.autolog.car.CarService;
 import kg.autolog.car.CarState;
+import kg.autolog.charge.ChargeService;
 import kg.autolog.common.AutologProperties;
 import kg.autolog.driver.Driver;
 import kg.autolog.driver.DriverRepository;
@@ -36,6 +37,7 @@ class BotScreens {
     private final HouseholdService households;
     private final CarService cars;
     private final TripService trips;
+    private final ChargeService charges;
     private final DriverRepository drivers;
     private final AutologProperties props;
     private final Clock clock;
@@ -72,6 +74,14 @@ class BotScreens {
                         row.add(button("🏁 Закончить поездку на «" + c.getName() + "»", Buttons.TRIP_FINISH + t.getId())));
             }
             if (RefuelFlow.canRefuel(c, driver)) row.add(button("⛽ Заправка", Buttons.FUEL_CAR + c.getId()));
+            if (ChargeFlow.canCharge(c)) row.add(button("🔌 Зарядка", Buttons.CHARGE_CAR + c.getId()));
+            if (c.isElectric() && c.getState() == CarState.ON_TRIP && driver.getId().equals(c.getCurrentDriverId())) {
+                trips.openTripOf(c.getId()).ifPresent(t -> row.add(button("🔌 Подзарядка", Buttons.ROAD_CHARGE + t.getId())));
+            }
+            if (c.getState() == CarState.CHARGING) {
+                charges.openChargeOf(c.getId()).ifPresent(ch ->
+                        row.add(button("🔋 Закончить зарядку «" + c.getName() + "»", Buttons.CHARGE_FINISH + ch.getId())));
+            }
             if (!row.isEmpty()) rows.add(row);
         }
         var gaps = trips.openGaps(driver);
@@ -84,6 +94,7 @@ class BotScreens {
         if (member.isOwner()) {
             rows.add(List.of(button("➕ Машина", Buttons.ADD_CAR), button("🔗 Пригласить", Buttons.INVITE)));
         }
+        if (list.stream().anyMatch(Car::isElectric)) rows.add(List.of(button("⚙️ Цены", Buttons.PRICES)));
         return Reply.of(sb.toString().trim(), rows);
     }
 

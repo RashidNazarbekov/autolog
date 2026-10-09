@@ -6,6 +6,8 @@ import kg.autolog.car.CarService;
 import kg.autolog.car.CarState;
 import kg.autolog.common.AutologException;
 import kg.autolog.driver.Driver;
+import kg.autolog.charge.ChargeEconomy;
+import kg.autolog.charge.ChargeRepository;
 import kg.autolog.driver.DriverRepository;
 import kg.autolog.fuel.FuelEconomy;
 import kg.autolog.household.HouseholdMemberRepository;
@@ -40,6 +42,8 @@ public class TripService {
     private final HouseholdMemberRepository members;
     private final DriverRepository drivers;
     private final FuelEconomy fuel;
+    private final ChargeRepository chargeRepository;
+    private final ChargeEconomy chargeEconomy;
     private final Clock clock;
 
     /** @param gap неучтённый пробег перед этой поездкой, если одометр ушёл вперёд */
@@ -49,7 +53,8 @@ public class TripService {
     /**
      * @param energyKwh       для электро: сколько кВт·ч ушло по падению заряда
      * @param estimatedLiters для дизеля: км × средний расход (по заправкам, иначе заводской)
-     * @param estimatedCost   для дизеля: литры × средняя цена по заправкам; {@code null}, если заправок не было
+     * @param estimatedCost   дизель: литры × средняя цена по заправкам ({@code null}, если заправок не было);
+     *                        электро: кВт·ч × средняя цена кВт·ч по зарядкам (пока их нет — домашний тариф)
      * @param litersPer100Km  расход, по которому считали литры
      * @param fromRefuels     расход посчитан по заправкам ({@code false} — заводской)
      */
@@ -137,9 +142,11 @@ public class TripService {
             throw new AutologException.Invalid("Больше " + MAX_TRIP_KM + " км за поездку — похоже на опечатку. Проверьте одометр");
         }
         socPct = checkSoc(car, socPct);
-        if (socPct != null && trip.getStartSocPct() != null && socPct > trip.getStartSocPct()) {
+        int gained = car.isElectric() ? socGain(trip.getId()) : 0;
+        if (socPct != null && trip.getStartSocPct() != null && socPct > trip.getStartSocPct() + gained) {
             throw new AutologException.Invalid("Заряд в конце (" + socPct + " %) больше, чем на старте ("
-                    + trip.getStartSocPct() + " %). Подзарядку в пути можно будет отмечать в следующей версии");
+                    + trip.getStartSocPct() + " %)" + (gained > 0 ? " с учётом подзарядок (+" + gained + " %)" : "")
+                    + ". Если подзаряжались в пути — отметьте подзарядку");
         }
         rangeKm = checkRange(rangeKm);
 
@@ -159,17 +166,25 @@ public class TripService {
         int km = trip.distanceKm();
         if (car.isElectric()) {
             BigDecimal energy = null;
+            BigDecimal cost = null;
             if (trip.getStartSocPct() != null && socPct != null) {
-                energy = car.getBatteryKwh().multiply(BigDecimal.valueOf(trip.getStartSocPct() - socPct))
+                // Израсходовано = заряд на старте + подзарядки в пути − заряд на финише
+                energy = car.getBatteryKwh().multiply(BigDecimal.valueOf(trip.getStartSocPct() + gained - socPct))
                         .divide(BigDecimal.valueOf(100), 1, RoundingMode.HALF_UP);
+                cost = energy.multiply(chargeEconomy.pricePerBatteryKwh(car)).setScale(0, RoundingMode.HALF_UP);
             }
-            return new FinishResult(trip, car, km, trip.duration(), energy, null, null, null, false);
+            return new FinishResult(trip, car, km, trip.duration(), energy, null, cost, null, false);
         }
         var f = fuel.tripFuel(car, km).orElse(null);
         return f == null
                 ? new FinishResult(trip, car, km, trip.duration(), null, null, null, null, false)
                 : new FinishResult(trip, car, km, trip.duration(), null, f.liters(), f.cost(),
                         f.basis().litersPer100Km(), f.basis().fromRefuels());
+    }
+
+    /** На сколько % подзарядили машину во время поездки. */
+    public int socGain(long tripId) {
+        return (int) chargeRepository.socGainDuringTrip(tripId);
     }
 
     /** Неучтённые км, по которым ещё не выяснили, кто ездил. */
