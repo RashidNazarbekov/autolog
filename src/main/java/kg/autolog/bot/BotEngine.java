@@ -41,6 +41,7 @@ public class BotEngine {
     private final RefuelFlow refuelFlow;
     private final ChargeFlow chargeFlow;
     private final PriceFlow priceFlow;
+    private final ExpenseFlow expenseFlow;
 
     public List<Reply> handle(Incoming in) {
         var driver = drivers.register(in.userId(), in.firstName(), in.lastName(), in.username());
@@ -69,6 +70,8 @@ public class BotEngine {
             case "cars" -> List.of(screens.carList(driver));
             case "invite" -> List.of(screens.invite(driver));
             case "prices" -> List.of(priceFlow.screen(driver));
+            case "expense" -> expenseFlow.start(driver);
+            case "expenses" -> List.of(expenseFlow.recent(driver));
             case "cancel" -> cancel(driver);
             case "help" -> List.of(help());
             default -> List.of(Reply.of("Не знаю такую команду. Список — /help"), screens.menu(driver));
@@ -105,6 +108,8 @@ public class BotEngine {
                 /cars — машины дома
                 /invite — пригласить водителя (для владельца)
                 /prices — цены на электричество
+                /expense — записать расход: мойка, ТО, шины, страховка, штраф…
+                /expenses — последние расходы
                 /cancel — отменить текущий ввод
                 /help — эта справка
 
@@ -125,6 +130,10 @@ public class BotEngine {
         if (data.startsWith(Buttons.ROAD_CHARGE)) return chargeFlow.roadPressed(driver, parseId(data, Buttons.ROAD_CHARGE));
         if (data.startsWith(Buttons.CHARGE_LOCATION)) return chargeFlow.location(driver, data.substring(Buttons.CHARGE_LOCATION.length()));
         if (data.startsWith(Buttons.PRICE)) return priceFlow.edit(driver, data.substring(Buttons.PRICE.length()));
+        if (data.startsWith(Buttons.EXPENSE_CAR)) return expenseFlow.carChosen(driver, parseId(data, Buttons.EXPENSE_CAR));
+        if (data.startsWith(Buttons.EXPENSE_CATEGORY)) return expenseFlow.categoryChosen(driver, parseId(data, Buttons.EXPENSE_CATEGORY));
+        if (data.startsWith(Buttons.EXPENSE_SPREAD)) return expenseFlow.spreadChosen(driver, data.substring(Buttons.EXPENSE_SPREAD.length()));
+        if (data.startsWith(Buttons.EXPENSE_OFFENDER)) return expenseFlow.offenderChosen(driver, data.substring(Buttons.EXPENSE_OFFENDER.length()));
         return switch (data) {
             case Buttons.MENU -> {
                 sessions.clear(id);
@@ -155,6 +164,9 @@ public class BotEngine {
             case Buttons.FUEL_LAST_PRICE -> refuelFlow.lastPrice(driver);
             case Buttons.FUEL_BY_TOTAL -> refuelFlow.byTotal(driver);
             case Buttons.CHARGE_SAME_ODOMETER -> chargeFlow.sameOdometer(driver);
+            case Buttons.EXPENSE -> expenseFlow.start(driver);
+            case Buttons.EXPENSES -> List.of(expenseFlow.recent(driver));
+            case Buttons.EXPENSE_NEW_CATEGORY -> expenseFlow.newCategory(driver);
             case Buttons.PRICES -> {
                 sessions.clear(id);
                 yield List.of(priceFlow.screen(driver));
@@ -200,6 +212,12 @@ public class BotEngine {
             case CHARGE_END_KWH, ROAD_CHARGE_KWH -> chargeFlow.kwh(driver, session, text);
             case CHARGE_END_PAID, ROAD_CHARGE_PAID -> chargeFlow.paid(driver, session, text);
             case SETTING_VALUE -> priceFlow.value(driver, session, text);
+            case EXPENSE_CAR, EXPENSE_CATEGORY, EXPENSE_OFFENDER ->
+                    List.of(Reply.of("Выберите кнопкой.", Buttons.cancel()));
+            case EXPENSE_AMOUNT -> expenseFlow.amount(driver, session, text);
+            case EXPENSE_SPREAD -> expenseFlow.spread(driver, session, text);
+            case EXPENSE_NOTE -> expenseFlow.note(driver, session, text);
+            case CATEGORY_NAME -> expenseFlow.categoryName(driver, session, text);
         };
     }
 
@@ -224,6 +242,7 @@ public class BotEngine {
         if (session.state() == BotState.CAR_AWAIT_CONSUMPTION) return saveCar(driver, session.data(), null);
         if (TripFlow.isRangeStep(session.state())) return tripFlow.skipRange(driver, session);
         if (ChargeFlow.isSkippable(session.state())) return chargeFlow.skip(driver, session);
+        if (session.state() == BotState.EXPENSE_NOTE) return expenseFlow.skipNote(driver, session);
         return stale(driver);
     }
 
