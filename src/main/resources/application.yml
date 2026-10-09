@@ -1,0 +1,24 @@
+spring:
+  application.name: autolog
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/autolog}
+    username: ${DB_USER:autolog}
+    password: ${DB_PASSWORD:autolog}
+  jpa:
+    open-in-view: false
+    # Схемой управляет только Flyway
+    hibernate.ddl-auto: validate
+    properties.hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints.web.exposure.include: health,info
+  endpoint.health.probes.enabled: true
+
+autolog:
+  # Часовой пояс для «сегодня», дат в боте и отчётах
+  zone: Asia/Bishkek

@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: autolog
+      POSTGRES_USER: autolog
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-autolog}
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autolog"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Запуск всего вместе: docker compose --profile app up -d --build
+  app:
+    build: .
+    profiles: [app]
+    depends_on:
+      db: { condition: service_healthy }
+    env_file: [.env]
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/autolog
+    ports: ["8080:8080"]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
