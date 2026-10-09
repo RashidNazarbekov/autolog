@@ -8,16 +8,16 @@
 
 ## Стек
 
-Java 21 · Spring Boot 3 · PostgreSQL 16 + Flyway · Telegram Bot API · JUnit 5 + Testcontainers · Docker Compose · GitHub Actions
+Java 21 · Spring Boot 3 · Maven · PostgreSQL 16 + Flyway · Telegram Bot API · JUnit 5 + Testcontainers · Docker Compose · GitHub Actions
 
 ## Запуск локально
 
-Нужны JDK 21 и Docker.
+Нужны JDK 21, Maven 3.9+ и Docker.
 
 ```bash
 cp .env.example .env          # заполнить секреты
 docker compose up -d db       # PostgreSQL на localhost:5432
-./gradlew bootRun             # приложение на http://localhost:8080
+mvn spring-boot:run           # приложение на http://localhost:8080
 ```
 
 Проверка: `curl localhost:8080/actuator/health` → `{"status":"UP"}`.
@@ -25,7 +25,7 @@ docker compose up -d db       # PostgreSQL на localhost:5432
 Тесты (поднимают PostgreSQL в Docker сами):
 
 ```bash
-./gradlew test
+mvn test
 ```
 
 Всё в контейнерах: `docker compose --profile app up -d --build`.
