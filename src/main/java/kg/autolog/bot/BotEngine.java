@@ -39,6 +39,8 @@ public class BotEngine {
     private final BotScreens screens;
     private final TripFlow tripFlow;
     private final RefuelFlow refuelFlow;
+    private final ChargeFlow chargeFlow;
+    private final PriceFlow priceFlow;
 
     public List<Reply> handle(Incoming in) {
         var driver = drivers.register(in.userId(), in.firstName(), in.lastName(), in.username());
@@ -66,6 +68,7 @@ public class BotEngine {
             }
             case "cars" -> List.of(screens.carList(driver));
             case "invite" -> List.of(screens.invite(driver));
+            case "prices" -> List.of(priceFlow.screen(driver));
             case "cancel" -> cancel(driver);
             case "help" -> List.of(help());
             default -> List.of(Reply.of("Не знаю такую команду. Список — /help"), screens.menu(driver));
@@ -94,11 +97,14 @@ public class BotEngine {
                 Вернулись: /menu → «🏁 Закончить поездку» → пробег.
                 Для электро бот спросит ещё заряд батареи в %, для дизеля — запас хода (можно пропустить).
                 Заправились: «⛽ Заправка» → пробег → литры и цена (или сумма) — можно и посреди поездки.
+                Электро: «🔌 Зарядка» → где → пробег → %; сняли — «🔋 Закончить зарядку». В пути — «🔌 Подзарядка».
+                Цены на электричество — «⚙️ Цены» в меню.
 
                 <b>Команды</b>
                 /menu — машины и действия
                 /cars — машины дома
                 /invite — пригласить водителя (для владельца)
+                /prices — цены на электричество
                 /cancel — отменить текущий ввод
                 /help — эта справка
 
@@ -114,6 +120,11 @@ public class BotEngine {
         if (data.startsWith(Buttons.TRIP_FINISH)) return tripFlow.finishPressed(driver, parseId(data, Buttons.TRIP_FINISH));
         if (data.startsWith(Buttons.GAP)) return tripFlow.gapAnswer(driver, data.substring(Buttons.GAP.length()));
         if (data.startsWith(Buttons.FUEL_CAR)) return refuelFlow.pressed(driver, parseId(data, Buttons.FUEL_CAR));
+        if (data.startsWith(Buttons.CHARGE_CAR)) return chargeFlow.pressed(driver, parseId(data, Buttons.CHARGE_CAR));
+        if (data.startsWith(Buttons.CHARGE_FINISH)) return chargeFlow.finishPressed(driver, parseId(data, Buttons.CHARGE_FINISH));
+        if (data.startsWith(Buttons.ROAD_CHARGE)) return chargeFlow.roadPressed(driver, parseId(data, Buttons.ROAD_CHARGE));
+        if (data.startsWith(Buttons.CHARGE_LOCATION)) return chargeFlow.location(driver, data.substring(Buttons.CHARGE_LOCATION.length()));
+        if (data.startsWith(Buttons.PRICE)) return priceFlow.edit(driver, data.substring(Buttons.PRICE.length()));
         return switch (data) {
             case Buttons.MENU -> {
                 sessions.clear(id);
@@ -143,6 +154,11 @@ public class BotEngine {
             case Buttons.FUEL_SAME_ODOMETER -> refuelFlow.sameOdometer(driver);
             case Buttons.FUEL_LAST_PRICE -> refuelFlow.lastPrice(driver);
             case Buttons.FUEL_BY_TOTAL -> refuelFlow.byTotal(driver);
+            case Buttons.CHARGE_SAME_ODOMETER -> chargeFlow.sameOdometer(driver);
+            case Buttons.PRICES -> {
+                sessions.clear(id);
+                yield List.of(priceFlow.screen(driver));
+            }
             case Buttons.SKIP -> skip(driver);
             case Buttons.CARS -> List.of(screens.carList(driver));
             case Buttons.MEMBERS -> List.of(screens.memberList(driver));
@@ -174,6 +190,16 @@ public class BotEngine {
             case REFUEL_LITERS -> refuelFlow.liters(driver, session, text);
             case REFUEL_PRICE -> refuelFlow.price(driver, session, text);
             case REFUEL_TOTAL -> refuelFlow.total(driver, session, text);
+            case CHARGE_LOCATION, ROAD_CHARGE_LOCATION ->
+                    List.of(Reply.of("Выберите кнопкой, где заряжаете.", Buttons.cancel()));
+            case CHARGE_START_ODOMETER -> chargeFlow.odometer(driver, session, Format.integer(text));
+            case CHARGE_START_SOC -> chargeFlow.startSoc(driver, session, text);
+            case CHARGE_END_SOC -> chargeFlow.endSoc(driver, session, text);
+            case ROAD_CHARGE_SOC_BEFORE -> chargeFlow.roadSocBefore(driver, session, text);
+            case ROAD_CHARGE_SOC_AFTER -> chargeFlow.roadSocAfter(driver, session, text);
+            case CHARGE_END_KWH, ROAD_CHARGE_KWH -> chargeFlow.kwh(driver, session, text);
+            case CHARGE_END_PAID, ROAD_CHARGE_PAID -> chargeFlow.paid(driver, session, text);
+            case SETTING_VALUE -> priceFlow.value(driver, session, text);
         };
     }
 
@@ -197,6 +223,7 @@ public class BotEngine {
         var session = sessions.get(driver.getTelegramId());
         if (session.state() == BotState.CAR_AWAIT_CONSUMPTION) return saveCar(driver, session.data(), null);
         if (TripFlow.isRangeStep(session.state())) return tripFlow.skipRange(driver, session);
+        if (ChargeFlow.isSkippable(session.state())) return chargeFlow.skip(driver, session);
         return stale(driver);
     }
 

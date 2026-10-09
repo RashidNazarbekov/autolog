@@ -98,6 +98,7 @@ class TripFlow {
         var rows = new ArrayList<List<Reply.Button>>();
         rows.add(List.of(button("🏁 Закончить поездку", Buttons.TRIP_FINISH + trip.getId())));
         if (!car.isElectric()) rows.add(List.of(button("⛽ Заправка в пути", Buttons.FUEL_CAR + car.getId())));
+        else rows.add(List.of(button("🔌 Подзарядка в пути", Buttons.ROAD_CHARGE + trip.getId())));
         rows.add(List.of(button("Меню", Buttons.MENU)));
         replies.add(Reply.of(sb.toString(), rows));
         if (result.gap() != null) replies.add(screens.gapQuestion(driver, result.gap()));
@@ -141,9 +142,12 @@ class TripFlow {
         var soc = percent(text);
         if (soc == null) return retry("Нужен заряд в процентах — целое число от 0 до 100, например <i>62</i>");
         var trip = trips.requireOpenTrip(driver, Long.parseLong(session.get("tripId")));
-        if (trip.getStartSocPct() != null && soc > trip.getStartSocPct()) {
-            return retry("Заряд больше, чем на старте (" + trip.getStartSocPct()
-                    + " %). Если подзаряжались в пути — пока укажите заряд как на старте, отметку подзарядки добавим следующей фичей.");
+        int gained = trips.socGain(trip.getId());
+        if (trip.getStartSocPct() != null && soc > trip.getStartSocPct() + gained) {
+            return List.of(Reply.of("⚠️ Заряд больше, чем на старте (" + trip.getStartSocPct() + " %"
+                            + (gained > 0 ? " и +" + gained + " % подзарядок" : "") + "). Подзаряжались в пути — отметьте подзарядку.",
+                    List.of(List.of(button("🔌 Отметить подзарядку", Buttons.ROAD_CHARGE + trip.getId())),
+                            List.of(button("Отмена", Buttons.CANCEL)))));
         }
         return doFinish(driver, session.data(), soc, null);
     }
@@ -165,6 +169,7 @@ class TripFlow {
                     .append(r.trip().getStartSocPct()).append(" → ").append(r.trip().getEndSocPct()).append(" %)");
             var per100 = r.consumptionPer100();
             if (per100 != null) sb.append(" — ").append(Format.number(per100)).append(" кВт·ч на 100 км");
+            if (r.estimatedCost() != null) sb.append("\n≈ <b>").append(Format.number(r.estimatedCost())).append(" сом</b> по средней цене зарядок");
         }
         if (r.estimatedLiters() != null) {
             sb.append("\n≈ ").append(Format.number(r.estimatedLiters())).append(" л");

@@ -41,6 +41,22 @@ final class Buttons {
     /** Ввести сумму вместо литров или цены */
     static final String FUEL_BY_TOTAL = "fuel:sum";
 
+    /** chg:car:{carId} — поставить на зарядку */
+    static final String CHARGE_CAR = "chg:car:";
+    /** chg:finish:{chargeId} — снять с зарядки */
+    static final String CHARGE_FINISH = "chg:finish:";
+    /** chg:road:{tripId} — подзарядка в пути */
+    static final String ROAD_CHARGE = "chg:road:";
+    /** chg:loc:{HOME|DC40|DC80|DC120} — где заряжаем */
+    static final String CHARGE_LOCATION = "chg:loc:";
+    /** Пробег не изменился с прошлой отметки */
+    static final String CHARGE_SAME_ODOMETER = "chg:same";
+
+    /** Цены дома (для владельца) */
+    static final String PRICES = "prices";
+    /** set:{PriceSetting} — изменить цену */
+    static final String PRICE = "set:";
+
     static List<List<Reply.Button>> cancel() {
         return List.of(List.of(button("Отмена", CANCEL)));
     }

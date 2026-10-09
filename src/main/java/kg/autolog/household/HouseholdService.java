@@ -71,6 +71,23 @@ public class HouseholdService {
         return household;
     }
 
+    /** Владелец меняет цену или процент потерь. */
+    @Transactional
+    public Household updatePrice(Driver owner, PriceSetting setting, java.math.BigDecimal value) {
+        var household = households.findById(requireOwner(owner).getHouseholdId()).orElseThrow();
+        if (value == null || value.compareTo(setting.min()) < 0 || value.compareTo(setting.max()) > 0) {
+            throw new AutologException.Invalid(setting.title() + ": от " + setting.min().toPlainString()
+                    + " до " + setting.max().toPlainString() + " " + setting.unit());
+        }
+        setting.set(household, value.setScale(2, java.math.RoundingMode.HALF_UP));
+        return household;
+    }
+
+    /** Дом по id — для расчётов, где права уже проверены. */
+    public Household byId(long householdId) {
+        return households.findById(householdId).orElseThrow(() -> new AutologException.NotFound("Дом не найден"));
+    }
+
     /** Новый код приглашения; прежний перестаёт работать. */
     @Transactional
     public String createInvite(Driver owner) {
