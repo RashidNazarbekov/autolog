@@ -67,7 +67,7 @@ class BotEngineTest extends IntegrationTest {
 
     void createHome(long user) {
         say(user, "/start");
-        press(user, BotEngine.CREATE_HOME);
+        press(user, Buttons.CREATE_HOME);
         say(user, "Дом Назарбековых");
     }
 
@@ -76,20 +76,20 @@ class BotEngineTest extends IntegrationTest {
         var r = say(owner, "/start");
 
         assertThat(text(r)).contains("Привет, User" + owner);
-        assertThat(buttons(r)).containsExactly(BotEngine.CREATE_HOME, BotEngine.JOIN_HOME);
+        assertThat(buttons(r)).containsExactly(Buttons.CREATE_HOME, Buttons.JOIN_HOME);
         assertThat(drivers.findByTelegramId(owner)).isPresent();
     }
 
     @Test
     void ownerCreatesHomeAndAddsDieselCar() {
         say(owner, "/start");
-        press(owner, BotEngine.CREATE_HOME);
+        press(owner, Buttons.CREATE_HOME);
         var created = say(owner, "  Дом Назарбековых ");
         assertThat(text(created)).contains("Дом Назарбековых", "владелец");
-        assertThat(buttons(created)).contains(BotEngine.ADD_CAR, BotEngine.INVITE);
+        assertThat(buttons(created)).contains(Buttons.ADD_CAR, Buttons.INVITE);
 
-        press(owner, BotEngine.ADD_CAR);
-        press(owner, BotEngine.CAR_TYPE + FuelType.DIESEL);
+        press(owner, Buttons.ADD_CAR);
+        press(owner, Buttons.CAR_TYPE + FuelType.DIESEL);
         assertThat(text(say(owner, "Прадо"))).contains("Объём бака");
         assertThat(text(say(owner, "87 л"))).contains("пробег");
         assertThat(text(say(owner, "150 000"))).contains("л на 100 км");
@@ -109,25 +109,25 @@ class BotEngineTest extends IntegrationTest {
     @Test
     void electricCarWithSkippedConsumption() {
         createHome(owner);
-        press(owner, BotEngine.ADD_CAR);
-        press(owner, BotEngine.CAR_TYPE + FuelType.ELECTRIC);
+        press(owner, Buttons.ADD_CAR);
+        press(owner, Buttons.CAR_TYPE + FuelType.ELECTRIC);
         assertThat(text(say(owner, "Эмка"))).contains("Ёмкость батареи");
         say(owner, "40,3");
         var ask = say(owner, "1200");
-        assertThat(buttons(ask)).contains(BotEngine.SKIP);
+        assertThat(buttons(ask)).contains(Buttons.SKIP);
 
-        var done = press(owner, BotEngine.SKIP);
+        var done = press(owner, Buttons.SKIP);
         assertThat(text(done)).contains("Добавлена", "Эмка");
 
-        var list = press(owner, BotEngine.CARS);
+        var list = press(owner, Buttons.CARS);
         assertThat(text(list)).contains("батарея 40,3 кВт·ч").doesNotContain("расход");
     }
 
     @Test
     void wrongInputIsExplainedAndStepRepeats() {
         createHome(owner);
-        press(owner, BotEngine.ADD_CAR);
-        press(owner, BotEngine.CAR_TYPE + FuelType.DIESEL);
+        press(owner, Buttons.ADD_CAR);
+        press(owner, Buttons.CAR_TYPE + FuelType.DIESEL);
         say(owner, "Прадо");
 
         assertThat(text(say(owner, "много"))).contains("⚠️", "объём бака");
@@ -138,22 +138,22 @@ class BotEngineTest extends IntegrationTest {
     @Test
     void duplicateCarNameIsCaughtEarly() {
         createHome(owner);
-        press(owner, BotEngine.ADD_CAR);
-        press(owner, BotEngine.CAR_TYPE + FuelType.DIESEL);
+        press(owner, Buttons.ADD_CAR);
+        press(owner, Buttons.CAR_TYPE + FuelType.DIESEL);
         say(owner, "Прадо");
         say(owner, "87");
         say(owner, "150000");
-        press(owner, BotEngine.SKIP);
+        press(owner, Buttons.SKIP);
 
-        press(owner, BotEngine.ADD_CAR);
-        press(owner, BotEngine.CAR_TYPE + FuelType.ELECTRIC);
+        press(owner, Buttons.ADD_CAR);
+        press(owner, Buttons.CAR_TYPE + FuelType.ELECTRIC);
         assertThat(text(say(owner, "прадо"))).contains("уже есть");
     }
 
     @Test
     void driverJoinsByInviteLink() {
         createHome(owner);
-        var invite = press(owner, BotEngine.INVITE);
+        var invite = press(owner, Buttons.INVITE);
         assertThat(text(invite)).contains("https://t.me/autolog_test_bot?start=join_");
         var m = CODE.matcher(text(invite));
         assertThat(m.find()).isTrue();
@@ -163,17 +163,17 @@ class BotEngineTest extends IntegrationTest {
         assertThat(text(joined)).contains("Вы в доме «Дом Назарбековых»");
         var brotherId = drivers.findByTelegramId(brother).orElseThrow().getId();
         assertThat(members.findFirstByDriverId(brotherId).orElseThrow().getRole()).isEqualTo(MemberRole.DRIVER);
-        assertThat(text(press(owner, BotEngine.MEMBERS))).contains("User" + owner, "владелец", "User" + brother);
+        assertThat(text(press(owner, Buttons.MEMBERS))).contains("User" + owner, "владелец", "User" + brother);
     }
 
     @Test
     void driverJoinsByTypingCodeAfterAMistake() {
         createHome(owner);
-        var m = CODE.matcher(text(press(owner, BotEngine.INVITE)));
+        var m = CODE.matcher(text(press(owner, Buttons.INVITE)));
         assertThat(m.find()).isTrue();
 
         say(brother, "/start");
-        press(brother, BotEngine.JOIN_HOME);
+        press(brother, Buttons.JOIN_HOME);
         assertThat(text(say(brother, "WRONG123"))).contains("⚠️", "Код не найден");
         assertThat(text(say(brother, m.group(1).toLowerCase()))).contains("Вы в доме");
     }
@@ -181,20 +181,20 @@ class BotEngineTest extends IntegrationTest {
     @Test
     void driverCannotAddCarsOrInvite() {
         createHome(owner);
-        var m = CODE.matcher(text(press(owner, BotEngine.INVITE)));
+        var m = CODE.matcher(text(press(owner, Buttons.INVITE)));
         assertThat(m.find()).isTrue();
         say(brother, "/start join_" + m.group(1));
 
         var menu = say(brother, "/menu");
-        assertThat(buttons(menu)).doesNotContain(BotEngine.ADD_CAR, BotEngine.INVITE);
-        assertThat(text(press(brother, BotEngine.ADD_CAR))).contains("только владелец");
+        assertThat(buttons(menu)).doesNotContain(Buttons.ADD_CAR, Buttons.INVITE);
+        assertThat(text(press(brother, Buttons.ADD_CAR))).contains("только владелец");
     }
 
     @Test
     void cancelLeavesTheWizard() {
         createHome(owner);
-        press(owner, BotEngine.ADD_CAR);
-        press(owner, BotEngine.CAR_TYPE + FuelType.DIESEL);
+        press(owner, Buttons.ADD_CAR);
+        press(owner, Buttons.CAR_TYPE + FuelType.DIESEL);
 
         var cancelled = say(owner, "/cancel");
         assertThat(text(cancelled)).contains("Отменено");
