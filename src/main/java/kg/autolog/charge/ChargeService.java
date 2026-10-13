@@ -148,7 +148,7 @@ public class ChargeService {
 
     private Car requireElectric(Driver driver, long carId) {
         var car = cars.require(driver, carId);
-        if (!car.isElectric()) throw new AutologException.Invalid("Зарядка — только для электро. Для дизеля есть заправка");
+        if (!car.isElectric()) throw new AutologException.Invalid("Зарядка — только для электро. Для бензина, дизеля и газа есть заправка");
         return car;
     }
 

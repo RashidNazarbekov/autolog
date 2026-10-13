@@ -105,15 +105,15 @@ class ReportFlow {
 
         var cmp = r.comparison();
         if (cmp != null) {
-            sb.append("\n⚖️ <b>Дизель против электро</b>\n")
-                    .append("1 км по энергии: дизель ").append(Format.number(cmp.dieselPerKm())).append(" сом · электро ")
+            sb.append("\n⚖️ <b>Топливо против электро</b>\n")
+                    .append("1 км по энергии: топливо ").append(Format.number(cmp.dieselPerKm())).append(" сом · электро ")
                     .append(Format.number(cmp.evPerKm())).append(" сом\n");
             if (cmp.evKm() > 0 && cmp.savings().signum() > 0) {
                 sb.append("Электро сэкономил ≈ <b>").append(money(cmp.savings())).append(" сом</b> на ")
                         .append(Format.km(cmp.evKm())).append(" км\n");
             }
             if (cmp.dieselTotalPerKm() != null && cmp.evTotalPerKm() != null) {
-                sb.append("Полная стоимость 1 км: дизель ").append(Format.number(cmp.dieselTotalPerKm()))
+                sb.append("Полная стоимость 1 км: топливо ").append(Format.number(cmp.dieselTotalPerKm()))
                         .append(" · электро ").append(Format.number(cmp.evTotalPerKm())).append(" сом\n");
             }
         }

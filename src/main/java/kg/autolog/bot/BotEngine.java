@@ -104,7 +104,7 @@ public class BotEngine {
                 <b>Как пользоваться</b>
                 Перед поездкой: /menu → «▶ Поехать на …» → пробег.
                 Вернулись: /menu → «🏁 Закончить поездку» → пробег.
-                Для электро бот спросит ещё заряд батареи в %, для дизеля — запас хода (можно пропустить).
+                Для электро бот спросит ещё заряд батареи в %, для остальных — запас хода (можно пропустить).
                 Заправились: «⛽ Заправка» → пробег → литры и цена (или сумма) — можно и посреди поездки.
                 Электро: «🔌 Зарядка» → где → пробег → %; сняли — «🔋 Закончить зарядку». В пути — «🔌 Подзарядка».
                 Цены на электричество — «⚙️ Цены» в меню.
@@ -116,7 +116,7 @@ public class BotEngine {
                 /prices — цены на электричество
                 /expense — записать расход: мойка, ТО, шины, страховка, штраф…
                 /expenses — последние расходы
-                /report — отчёты: машины, водители, дизель против электро, журнал
+                /report — отчёты: машины, водители, топливо против электро, журнал
                 /cancel — отменить текущий ввод
                 /help — эта справка
 
@@ -165,7 +165,9 @@ public class BotEngine {
                 households.requireOwner(driver);
                 sessions.save(id, BotState.CAR_AWAIT_TYPE, new LinkedHashMap<>());
                 yield List.of(Reply.of("Какая машина?", List.of(
-                        List.of(button("⛽ Дизель", Buttons.CAR_TYPE + FuelType.DIESEL),
+                        List.of(button("⛽ Бензин", Buttons.CAR_TYPE + FuelType.PETROL),
+                                button("⛽ Дизель", Buttons.CAR_TYPE + FuelType.DIESEL)),
+                        List.of(button("🔥 Газ", Buttons.CAR_TYPE + FuelType.GAS),
                                 button("🔌 Электро", Buttons.CAR_TYPE + FuelType.ELECTRIC)),
                         List.of(button("Отмена", Buttons.CANCEL)))));
             }
@@ -279,8 +281,13 @@ public class BotEngine {
         var data = new LinkedHashMap<String, String>();
         data.put("type", fuel.name());
         sessions.save(driver.getTelegramId(), BotState.CAR_AWAIT_NAME, data);
-        return List.of(Reply.of("Как называете машину дома? Например: <i>"
-                + (fuel == FuelType.DIESEL ? "Прадо" : "Эмка") + "</i>", Buttons.cancel()));
+        var example = switch (fuel) {
+            case PETROL -> "Toyota Land Cruiser";
+            case DIESEL -> "BMW X5";
+            case GAS -> "Kia K5";
+            case ELECTRIC -> "Changan Q05";
+        };
+        return List.of(Reply.of("Как называете машину дома? Например: <i>" + example + "</i>", Buttons.cancel()));
     }
 
     private List<Reply> carName(Driver driver, BotSessionStore.Session session, String text) {
@@ -335,11 +342,12 @@ public class BotEngine {
     }
 
     private List<Reply> saveCar(Driver driver, Map<String, String> data, BigDecimal consumption) {
-        var electric = isElectric(data);
+        var fuel = FuelType.valueOf(data.get("type"));
+        var electric = fuel == FuelType.ELECTRIC;
         var capacity = new BigDecimal(data.get("capacity"));
         var draft = new CarDraft(
                 data.get("name"),
-                electric ? FuelType.ELECTRIC : FuelType.DIESEL,
+                fuel,
                 null,
                 electric ? null : capacity,
                 electric ? capacity : null,

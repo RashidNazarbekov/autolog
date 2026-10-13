@@ -52,7 +52,7 @@ public class RefuelService {
     public Result record(Driver driver, long carId, int odometerKm,
                         BigDecimal liters, BigDecimal pricePerLiter, BigDecimal totalCost) {
         var car = cars.require(driver, carId);
-        if (car.isElectric()) throw new AutologException.Invalid("Заправка — только для дизеля. Для электро будет зарядка");
+        if (car.isElectric()) throw new AutologException.Invalid("Заправка — только для бензина, дизеля и газа. Для электро будет зарядка");
 
         Trip trip = null;
         if (car.getState() == CarState.ON_TRIP) {

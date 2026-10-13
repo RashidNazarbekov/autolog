@@ -219,7 +219,7 @@ class RefuelFlow {
         return List.of(Reply.of("⚠️ " + text, Buttons.cancel()));
     }
 
-    /** Можно ли заправлять эту машину из меню: дизель, свободна или в моей поездке. */
+    /** Можно ли заправлять эту машину из меню: не электро, свободна или в моей поездке. */
     static boolean canRefuel(Car car, Driver driver) {
         return !car.isElectric() && (car.getState() == CarState.FREE
                 || (car.getState() == CarState.ON_TRIP && driver.getId().equals(car.getCurrentDriverId())));
