@@ -52,6 +52,15 @@ class CarServiceTest extends IntegrationTest {
     }
 
     @Test
+    void ownerAddsPetrolAndGas() {
+        var petrol = new CarDraft("Королла", FuelType.PETROL, null, new BigDecimal("50"), null, null, 0);
+        var gas = new CarDraft("Дамас", FuelType.GAS, null, new BigDecimal("60"), null, null, 0);
+
+        assertThat(service.add(owner, petrol).getFuelType()).isEqualTo(FuelType.PETROL);
+        assertThat(service.add(owner, gas).getFuelType()).isEqualTo(FuelType.GAS);
+    }
+
+    @Test
     void capacityMustMatchFuelType() {
         var noTank = new CarDraft("Прадо", FuelType.DIESEL, null, null, null, null, 0);
         var tankOnElectric = new CarDraft("Эмка", FuelType.ELECTRIC, null, new BigDecimal("50"), new BigDecimal("40.3"), null, 0);

@@ -44,7 +44,7 @@ class ChargeFlow {
     List<Reply> pressed(Driver driver, long carId) {
         var car = cars.require(driver, carId);
         if (!car.isElectric()) {
-            return List.of(Reply.of("⚠️ «" + esc(car.getName()) + "» — дизель, для него есть заправка."), screens.menu(driver));
+            return List.of(Reply.of("⚠️ «" + esc(car.getName()) + "» — не электро, для него есть заправка."), screens.menu(driver));
         }
         if (car.getState() != CarState.FREE) {
             return List.of(Reply.of("⚠️ " + esc(trips.busyMessage(car))), screens.menu(driver));

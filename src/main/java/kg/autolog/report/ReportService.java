@@ -41,7 +41,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Отчёты за период: по машинам, по водителям, дизель против электро, журнал событий.
+ * Отчёты за период: по машинам, по водителям, топливо против электро, журнал событий.
  *
  * <p>Стоимость энергии в отчёте — по расходу и средней цене (км × расход × цена), а не сумма заправок за период:
  * заправка раз в две недели иначе делала бы одну неделю дорогой, а другую бесплатной.
@@ -68,7 +68,7 @@ public class ReportService {
     /**
      * @param km                 пробег за период: поездки + неучтённые км
      * @param untrackedKm        неучтённые км, которые никому не приписаны
-     * @param fuelLiters         дизель: залито за период
+     * @param fuelLiters         не электро: залито за период
      * @param chargedKwh         электро: из сети за период
      * @param energyPaid         заплачено за топливо или зарядки за период
      * @param consumption        л/100 км или кВт·ч/100 км
@@ -96,10 +96,10 @@ public class ReportService {
     }
 
     /**
-     * @param dieselPerKm стоимость энергии 1 км на дизеле
+     * @param dieselPerKm стоимость энергии 1 км не на электро (дизель, бензин, газ)
      * @param evPerKm     то же на электро
      * @param evKm        сколько проехали на электро за период
-     * @param savings     сколько сэкономили: (дизель − электро) × км на электро
+     * @param savings     сколько сэкономили: (не электро − электро) × км на электро
      */
     public record Comparison(BigDecimal dieselPerKm, BigDecimal evPerKm, int evKm, BigDecimal savings,
                              BigDecimal dieselTotalPerKm, BigDecimal evTotalPerKm) {

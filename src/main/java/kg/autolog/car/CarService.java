@@ -39,7 +39,7 @@ public class CarService {
     @Transactional
     public Car add(Driver owner, CarDraft d) {
         var householdId = households.requireOwner(owner).getHouseholdId();
-        if (d.fuelType() == null) throw new AutologException.Invalid("Укажите тип машины: дизель или электро");
+        if (d.fuelType() == null) throw new AutologException.Invalid("Укажите тип машины: бензин, дизель, газ или электро");
         var name = cleanName(d.name());
         if (cars.existsByHouseholdIdAndArchivedFalseAndNameIgnoreCase(householdId, name)) {
             throw new AutologException.Conflict("Машина «" + name + "» уже есть в доме");
@@ -88,7 +88,7 @@ public class CarService {
             car.setPlate(plate.isEmpty() ? null : plate);
         }
         if (d.tankLiters() != null) {
-            if (car.isElectric()) throw new AutologException.Invalid("Объём бака указывается только для дизеля");
+            if (car.isElectric()) throw new AutologException.Invalid("Объём бака указывается только для дизеля, бензина и газа");
             car.setTankLiters(positive(d.tankLiters(), MAX_TANK_LITERS, "Объём бака, л"));
         }
         if (d.batteryKwh() != null) {
@@ -114,7 +114,7 @@ public class CarService {
             throw new AutologException.Invalid("Для электро укажите ёмкость батареи, кВт·ч");
         }
         if (!car.isElectric() && car.getTankLiters() == null) {
-            throw new AutologException.Invalid("Для дизеля укажите объём бака, л");
+            throw new AutologException.Invalid("Для дизеля, бензина и газа укажите объём бака, л");
         }
     }
 

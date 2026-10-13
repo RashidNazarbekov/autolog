@@ -42,7 +42,7 @@ public class Car {
     @Column(length = 16)
     private String plate;
 
-    /** Объём бака, л — только дизель. */
+    /** Объём бака, л — не для электро. */
     @Column(name = "tank_liters", precision = 5, scale = 1)
     private BigDecimal tankLiters;
 

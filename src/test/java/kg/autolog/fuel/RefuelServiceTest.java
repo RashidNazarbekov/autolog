@@ -131,7 +131,7 @@ class RefuelServiceTest extends IntegrationTest {
     @Test
     void electricCarsAreNotRefuelled() {
         assertThatThrownBy(() -> refuels.record(owner, emka.getId(), 1_200, d("10"), d("88"), null))
-                .isInstanceOf(AutologException.Invalid.class).hasMessageContaining("только для дизеля");
+                .isInstanceOf(AutologException.Invalid.class).hasMessageContaining("только для бензина");
     }
 
     @Test
